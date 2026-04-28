@@ -58,17 +58,17 @@ class SparsityPenalties:
     gated: list[float]
 
 
-num_tokens = 500_000_000
+num_tokens = 5_000_000 # 500_000_000
 
 print(f"NOTE: Training on {num_tokens} tokens")
 
 eval_num_inputs = 200
 random_seeds = [0]
-dictionary_widths = [2**14, 2**16]
-# dictionary_widths = [2**14]
+dictionary_widths = [2**12]
+# dictionary_widths = [2**12, 2**14, 2**16]
 
 WARMUP_STEPS = 1000
-SPARSITY_WARMUP_STEPS = 5000
+SPARSITY_WARMUP_STEPS = 500 # 5000
 DECAY_START_FRACTION = 0.8
 K_ANNEAL_END_FRACTION = 0.01
 remove_bos = True
@@ -77,7 +77,7 @@ max_activation_norm_multiple = 10
 learning_rates = [5e-5]
 
 
-wandb_project = "qwen-8b-sweep"
+wandb_project = "sae_training_idempotency"
 
 LLM_CONFIG = {
     "EleutherAI/pythia-70m-deduped": LLMConfig(
