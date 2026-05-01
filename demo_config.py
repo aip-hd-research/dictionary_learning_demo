@@ -23,6 +23,7 @@ from dictionary_learning.dictionary_learning.trainers.matryoshka_batch_top_k imp
     MatryoshkaBatchTopKTrainer,
     MatryoshkaBatchTopKSAE,
 )
+from dictionary_learning.dictionary_learning.trainers.idempotent import IdempotentTrainer
 from dictionary_learning.dictionary_learning.dictionary import (
     AutoEncoder,
     GatedAutoEncoder,
@@ -40,6 +41,7 @@ class TrainerType(Enum):
     P_ANNEAL = "p_anneal"
     JUMP_RELU = "jump_relu"
     Matryoshka_BATCH_TOP_K = "matryoshka_batch_top_k"
+    IDEMPOTENT = "idempotent"
 
 
 @dataclass
@@ -58,17 +60,17 @@ class SparsityPenalties:
     gated: list[float]
 
 
-num_tokens = 5_000_000 # 500_000_000
+num_tokens = 500_000_000 # 500_000_000
 
 print(f"NOTE: Training on {num_tokens} tokens")
 
 eval_num_inputs = 200
 random_seeds = [0]
-dictionary_widths = [2**12]
+dictionary_widths = [2**12, 2**14]#, 2**16]
 # dictionary_widths = [2**12, 2**14, 2**16]
 
 WARMUP_STEPS = 1000
-SPARSITY_WARMUP_STEPS = 500 # 5000
+SPARSITY_WARMUP_STEPS = 5000 # 5000
 DECAY_START_FRACTION = 0.8
 K_ANNEAL_END_FRACTION = 0.01
 remove_bos = True
@@ -218,6 +220,16 @@ class JumpReluTrainerConfig(BaseTrainerConfig):
     sparsity_penalty: float = 1.0
     bandwidth: float = 0.001
 
+@dataclass
+class IdempotentTrainerConfig(BaseTrainerConfig):
+    dict_size: int
+    seed: int
+    lr: float
+    target_l0: int
+    sparsity_warmup_steps: Optional[int]
+    sparsity_penalty: float = 1.0
+    bandwidth: float = 0.001
+    idempotency_penalty: float = 0.0
 
 def get_trainer_configs(
     architectures: list[str],
@@ -383,6 +395,23 @@ def get_trainer_configs(
                 seed=seed,
                 target_l0=target_l0,
                 wandb_name=f"JumpReluTrainer-{model_name}-{submodule_name}",
+            )
+            trainer_configs.append(asdict(config))
+
+    if TrainerType.IDEMPOTENT.value in architectures:
+        for seed, dict_size, learning_rate, target_l0 in itertools.product(
+            seeds, dict_sizes, learning_rates, TARGET_L0s
+        ):
+            config = IdempotentTrainerConfig(
+                **base_config,
+                trainer=IdempotentTrainer,
+                dict_class=JumpReluAutoEncoder,
+                sparsity_warmup_steps=sparsity_warmup_steps,
+                lr=learning_rate,
+                dict_size=dict_size,
+                seed=seed,
+                target_l0=target_l0,
+                wandb_name=f"IdempotentTrainer-{model_name}-{submodule_name}",
             )
             trainer_configs.append(asdict(config))
 
