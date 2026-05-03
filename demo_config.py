@@ -24,6 +24,7 @@ from dictionary_learning.dictionary_learning.trainers.matryoshka_batch_top_k imp
     MatryoshkaBatchTopKSAE,
 )
 from dictionary_learning.dictionary_learning.trainers.idempotent import IdempotentTrainer
+from dictionary_learning.dictionary_learning.trainers.idempotent_matryoshka_batch_top_k import IdempotentMatryoshkaBatchTopKTrainer
 from dictionary_learning.dictionary_learning.dictionary import (
     AutoEncoder,
     GatedAutoEncoder,
@@ -42,6 +43,7 @@ class TrainerType(Enum):
     JUMP_RELU = "jump_relu"
     Matryoshka_BATCH_TOP_K = "matryoshka_batch_top_k"
     IDEMPOTENT = "idempotent"
+    IDEMPOTENT_MATRYOSHKA_BATCH_TOP_K = "idempotent_matryoshka_batch_top_k"
 
 
 @dataclass
@@ -66,7 +68,7 @@ print(f"NOTE: Training on {num_tokens} tokens")
 
 eval_num_inputs = 200
 random_seeds = [0]
-dictionary_widths = [2**12, 2**14]#, 2**16]
+dictionary_widths = [2**14]#, 2**16]
 # dictionary_widths = [2**12, 2**14, 2**16]
 
 WARMUP_STEPS = 1000
@@ -200,6 +202,28 @@ class MatryoshkaBatchTopKTrainerConfig(BaseTrainerConfig):
     threshold_start_step: int = 1000  # when to begin tracking the average threshold
     k_anneal_steps: Optional[int] = None
 
+@dataclass
+class IdempotentMatryoshkaBatchTopKTrainerConfig(BaseTrainerConfig):
+    dict_size: int
+    seed: int
+    lr: float
+    k: int
+    group_fractions: list[float] = field(
+        default_factory=lambda: [
+            (1 / 32),
+            (1 / 16),
+            (1 / 8),
+            (1 / 4),
+            ((1 / 2) + (1 / 32)),
+        ]
+    )
+    group_weights: Optional[list[float]] = None
+    auxk_alpha: float = 1 / 32
+    threshold_beta: float = 0.999
+    threshold_start_step: int = 1000  # when to begin tracking the average threshold
+    k_anneal_steps: Optional[int] = None
+    idempotency_penalty: float = 20.0
+    bandwidth: float = 0.001
 
 @dataclass
 class GatedTrainerConfig(BaseTrainerConfig):
@@ -412,6 +436,23 @@ def get_trainer_configs(
                 seed=seed,
                 target_l0=target_l0,
                 wandb_name=f"IdempotentTrainer-{model_name}-{submodule_name}",
+            )
+            trainer_configs.append(asdict(config))
+
+    if TrainerType.IDEMPOTENT_MATRYOSHKA_BATCH_TOP_K.value in architectures:
+        for seed, dict_size, learning_rate, k in itertools.product(
+            seeds, dict_sizes, learning_rates, TARGET_L0s
+        ):
+            config = IdempotentMatryoshkaBatchTopKTrainerConfig(
+                **base_config,
+                trainer=IdempotentMatryoshkaBatchTopKTrainer,
+                dict_class=MatryoshkaBatchTopKSAE,
+                lr=learning_rate,
+                dict_size=dict_size,
+                seed=seed,
+                k=k,
+                k_anneal_steps=anneal_end,
+                wandb_name=f"IdempotentMatryoshkaBatchTopKTrainer-{model_name}-{submodule_name}",
             )
             trainer_configs.append(asdict(config))
 
